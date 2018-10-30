@@ -1,7 +1,6 @@
 // RUN: %cxxamp -DFILE_1 -c %s -o %t.1.o
 // RUN: %cxxamp -DFILE_2 -c %s -o %t.2.o
 // RUN: %cxxamp %t.1.o %t.2.o -o %t.out
-// XFAIL: *
 
 // this test try to link 2 files which use C++AMP short vectors API in one
 // executable.  so it tests if short vector APIs would violate ODR rule
@@ -10,10 +9,10 @@
 
 void add(const array_view<float,1> &gbIn,const array_view<float_2,1> &gbOut) 
 {
-  Concurrency::extent<2> grdExt(64, 1);
-  Concurrency::tiled_extent<64, 1> t_ext(grdExt);
+  hc::extent<2> grdExt(64, 1);
+  hc::tiled_extent<2> t_ext(grdExt.tile(64, 1));
 
-  Concurrency::parallel_for_each(t_ext, [=] (Concurrency::tiled_index<64,1> tidx) restrict(amp)
+  hc::parallel_for_each(t_ext, [=] (hc::tiled_index<2> tidx) [[hc]]
   {
 
 	unsigned int me = tidx.global[0];
@@ -39,8 +38,8 @@ int main()
       gbOut[i].y = i + 1;
     }
     
-    const Concurrency::array_view<float, 1> gbInA(64, gbIn);
-    const Concurrency::array_view<float_2, 1> gbOutAB(64, gbOut);
+    const hc::array_view<float, 1> gbInA(64, gbIn);
+    const hc::array_view<float_2, 1> gbOutAB(64, gbOut);
 
     add(gbInA, gbOutAB); 
 
@@ -59,14 +58,14 @@ int main()
 #else
 #include "amp_short_vectors_2files.h"
 
-concurrency::array_view<float_2,1> *gbOutA;
+hc::array_view<float_2,1> *gbOutA;
 
 void sub(const array_view<float,1> &gbIn,const array_view<float_2,1> &gbOut) 
 {
-  Concurrency::extent<2> grdExt(64, 1);
-  Concurrency::tiled_extent<64, 1> t_ext(grdExt);
+  hc::extent<2> grdExt(64, 1);
+  hc::tiled_extent<2> t_ext(grdExt.tile(64, 1));
 
-  Concurrency::parallel_for_each(t_ext, [=] (Concurrency::tiled_index<64,1> tidx) restrict(amp)
+  hc::parallel_for_each(t_ext, [=] (hc::tiled_index<2> tidx) [[hc]]
   {
 
 	unsigned int me = tidx.global[0];

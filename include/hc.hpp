@@ -157,6 +157,11 @@ public:
     execute_order get_execute_order() const { return pQueue->get_execute_order(); }
 
     /**
+     * Returns the queue priority of this accelerator_view.
+     */
+    queue_priority get_queue_priority() const { return pQueue->get_queue_priority(); }
+
+    /**
      * Returns a boolean value indicating whether the accelerator view when
      * passed to a parallel_for_each would result in automatic selection of an
      * appropriate execution target by the runtime. In other words, this is the
@@ -820,8 +825,8 @@ public:
      *                  See "Queuing Mode". The default value would be
      *                  queueing_mdoe_automatic if not specified.
      */
-    accelerator_view create_view(execute_order order = execute_in_order, queuing_mode mode = queuing_mode_automatic) {
-        auto pQueue = pDev->createQueue(order);
+    accelerator_view create_view(execute_order order = execute_in_order, queuing_mode mode = queuing_mode_automatic, queue_priority priority = priority_normal) {
+        auto pQueue = pDev->createQueue(order, priority);
         pQueue->set_mode(mode);
         return pQueue;
     }
@@ -2746,14 +2751,25 @@ extern "C" unsigned int __sadhi_u16x2_u8x4(unsigned int src0, unsigned int src1,
 /**
  * Get system timestamp
  */
-extern "C" uint64_t __clock_u64() __HC__;
+extern "C" __attribute__((always_inline))
+std::uint64_t __ockl_memrealtime_u64(void);
+
+extern "C" inline __attribute((always_inline)) std::uint64_t __clock_u64() __HC__ {
+  return __ockl_memrealtime_u64();
+}
+
 
 /**
  * Get hardware cycle count
  *
  * Notice the return value of this function is implementation defined.
  */
-extern "C" uint64_t __cycle_u64() __HC__;
+extern "C" __attribute__((always_inline))
+std::uint64_t __ockl_memtime_u64(void);
+
+extern "C" inline __attribute((always_inline)) std::uint64_t __cycle_u64() __HC__ {
+  return __ockl_memtime_u64();
+}
 
 /**
  * Get the count of the number of earlier (in flattened
