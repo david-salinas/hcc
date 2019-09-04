@@ -30,7 +30,8 @@ endif( )
 string(TOLOWER "${DISTRO_ID}" DISTRO_ID )
 if( DISTRO_ID MATCHES "ubuntu" OR DISTRO_ID MATCHES "fedora"
    OR DISTRO_ID MATCHES "centos" OR DISTRO_ID MATCHES "redhatenterpriseserver"
-   OR DISTRO_ID MATCHES "opensuse")
+   OR DISTRO_ID MATCHES "opensuse"
+   OR DISTRO_ID MATCHES "sles" )
   message( STATUS "Detected distribution: ${DISTRO_ID}:${DISTRO_RELEASE}" )
 else()
   message( "This cmakefile does not natively support ${DISTRO_ID}:${DISTRO_RELEASE}.  Continuing with Ubuntu logic" )
@@ -48,17 +49,17 @@ endif()
 include (MCWAMP)
 
 # Regression test
-set(LLVM_SRC "${PROJECT_SOURCE_DIR}/compiler")
+set(LLVM_SRC "${PROJECT_SOURCE_DIR}/llvm-project/llvm")
 set(LLVM_ROOT "${PROJECT_BINARY_DIR}/compiler")
 
 # obtain specific information about llvm setup
-SET(LOCAL_LLVM_INCLUDE compiler/include)
+SET(LOCAL_LLVM_INCLUDE llvm-project/llvm/include)
 
 # setup compilation environment
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin" )
 set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib" )
 
-SET(PROJ_SEARCH_PATH "${PROJECT_BINARY_DIR}/include" "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/${LOCAL_LLVM_INCLUDE}") #  "${PROJECT_SOURCE_DIR}/compiler/utils/unittest/googletest/include" "${PROJECT_BINARY_DIR}/${LOCAL_LLVM_INCLUDE}"
+SET(PROJ_SEARCH_PATH "${PROJECT_BINARY_DIR}/include" "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/${LOCAL_LLVM_INCLUDE}") #  "${PROJECT_SOURCE_DIR}/llvm-project/llvm/utils/unittest/googletest/include" "${PROJECT_BINARY_DIR}/${LOCAL_LLVM_INCLUDE}"
 include_directories( ${PROJ_SEARCH_PATH} )
 
 LINK_DIRECTORIES( ${LLVM_LIB_DIR} )
@@ -290,7 +291,7 @@ set(KALMAR_BACKEND "HCC_BACKEND_AMDGPU")
 #########################
 
 # build Clang frontend + AMDGPU backend
-set(CLANG_SRC_DIR "${PROJECT_SOURCE_DIR}/compiler")
+set(CLANG_SRC_DIR "${PROJECT_SOURCE_DIR}/llvm-project/llvm")
 set(CLANG_BIN_DIR "${PROJECT_BINARY_DIR}/compiler")
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
@@ -299,9 +300,9 @@ else ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
   set(LLVM_ENABLE_ASSERTIONS "Off" CACHE BOOL "Compile with assertion checks enabled")
 endif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
-set(LLVM_EXTERNAL_CLANG_SOURCE_DIR "${PROJECT_SOURCE_DIR}/clang")
-set(LLVM_EXTERNAL_COMPILER_RT_SOURCE_DIR "${PROJECT_SOURCE_DIR}/compiler-rt")
-set(LLVM_EXTERNAL_LLD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/lld")
+set(LLVM_EXTERNAL_CLANG_SOURCE_DIR "${PROJECT_SOURCE_DIR}/llvm-project/clang")
+set(LLVM_EXTERNAL_COMPILER_RT_SOURCE_DIR "${PROJECT_SOURCE_DIR}/llvm-project/compiler-rt")
+set(LLVM_EXTERNAL_LLD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/llvm-project/lld")
 
 # determine LLVM targets to be built
 # AMDGPU is always on
@@ -319,11 +320,11 @@ set(LLVM_TARGETS_TO_BUILD "AMDGPU" ${LLVM_HOST_TARGET} CACHE STRING "" FORCE)
 set(LLVM_INSTALL_TOOLCHAIN_ONLY ON CACHE BOOL "" FORCE)
 
 if(EXISTS ${PROJECT_SOURCE_DIR}/clang-tools-extra/CMakeLists.txt)
-  set(LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR "${PROJECT_SOURCE_DIR}/clang-tools-extra")
+  set(LLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR "${PROJECT_SOURCE_DIR}/llvm-project/clang-tools-extra")
 endif()
 
 add_subdirectory(${CLANG_SRC_DIR})
-get_directory_property(CLANG_VERSION DIRECTORY clang DEFINITION CLANG_VERSION)
+get_directory_property(CLANG_VERSION DIRECTORY llvm-project/clang DEFINITION CLANG_VERSION)
 
 install(PROGRAMS $<TARGET_FILE:llvm-as>
                  $<TARGET_FILE:llvm-dis>
@@ -385,7 +386,7 @@ if (HCC_INTEGRATE_ROCDL)
   set(GENERIC_IS_ZERO ON CACHE BOOL ON FORCE)
   set(BUILD_HC_LIB ON)
   set(AMDGCN_TARGETS_LIB_LIST "AMDGCN_LIB_TARGETS")
-  find_package(LLVM REQUIRED CONFIG PATHS ${CMAKE_BINARY_DIR}/compiler NO_DEFAULT_PATH)
+  find_package(LLVM REQUIRED CONFIG PATHS ${CMAKE_BINARY_DIR}/llvm-project/llvm NO_DEFAULT_PATH)
 
   list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
   include(AddLLVM)
@@ -504,6 +505,16 @@ execute_process(COMMAND ${DEBIAN_EXTRA_SCRIPT_SOURCE_DIR}/process_packaging_scri
                                                                                        ${HCC_VERSION_MINOR}
                 WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
 
+execute_process(COMMAND ${DEBIAN_EXTRA_SCRIPT_SOURCE_DIR}/process_packaging_script.bsh ${DEBIAN_EXTRA_SCRIPT_SOURCE_DIR}/preinst_rpm.in
+                                                                                       ${DEBIAN_EXTRA_SCRIPT_DEST_DIR}/preinst_rpm
+                                                                                       ${CPACK_PACKAGE_NAME}
+                                                                                       ${HCC_PACKAGE_INSTALL_PREFIX}
+                                                                                       ${CMAKE_INSTALL_LIBDIR}
+                                                                                       ${CMAKE_SYSTEM_PROCESSOR}
+                                                                                       ${HCC_VERSION_MAJOR}
+                                                                                       ${HCC_VERSION_MINOR}
+                WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+
 set(CPACK_PACKAGE_VENDOR "Advanced Micro Devices, Inc")
 set(CPACK_PACKAGE_VERSION "${HCC_VERSION_MAJOR}.${HCC_VERSION_MINOR}.${HCC_VERSION_PATCH}")
 set(CPACK_PACKAGE_VERSION_MAJOR ${HCC_VERSION_MAJOR})
@@ -521,7 +532,9 @@ if( "${DISTRO_ID}" MATCHES "ubuntu" )
 elseif ("${DISTRO_ID}" MATCHES "fedora" OR
         "${DISTRO_ID}" MATCHES "centos" OR
         "${DISTRO_ID}" MATCHES "redhatenterpriseserver" OR
-        "${DISTRO_ID}" MATCHES "opensuse")
+        "${DISTRO_ID}" MATCHES "opensuse" OR
+        "${DISTRO_ID}" MATCHES "sles" )
+
   set( CPACK_GENERATOR "RPM" CACHE STRING "cpack list: 7Z, DEB, IFW, NSIS, NSIS64, RPM, STGZ, TBZ2, TGZ, TXZ, TZ, ZIP" FORCE )
 else()
   # generate a tarball for unknown DISTRO_ID
@@ -555,12 +568,17 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "${HCC_GENERAL_DEBIAN_DEP} ${HCC_ROCR_DEP} ${HC
 # RPM package settings
 set(CPACK_RPM_PACKAGE_DESCRIPTION ${PACKAGE_DESCRIPTION})
 set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${PROJECT_BINARY_DIR}/packaging/debian/postinst")
+set(CPACK_RPM_PRE_INSTALL_SCRIPT_FILE "${PROJECT_BINARY_DIR}/packaging/debian/preinst_rpm")
 set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE "${PROJECT_BINARY_DIR}/packaging/debian/prerm")
 
 # disable automatic shared libraries dependency detection
 set(CPACK_RPM_PACKAGE_AUTOREQ 0)
 
-set(HCC_GENERAL_RPM_DEP "coreutils, findutils, elfutils-libelf, pciutils-libs, file, pth")
+if( "${DISTRO_ID}" MATCHES "sles" )
+   set(HCC_GENERAL_RPM_DEP "coreutils, findutils, libelf-devel, pciutils, file")
+else()
+   set(HCC_GENERAL_RPM_DEP "coreutils, findutils, elfutils-libelf, pciutils-libs, file, pth")
+endif ()
 
 set(CPACK_RPM_PACKAGE_REQUIRES "${HCC_GENERAL_RPM_DEP} ${HCC_ROCR_DEP} ${HCC_LIBCXX_RPM_DEP}" )
 
